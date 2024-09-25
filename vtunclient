@@ -1,0 +1,25 @@
+#!/bin/bash
+
+SECRET=ABC
+SRVIP=128.31.20.227
+SRVPORT=5000
+NETID=0
+
+cat > vtunclnt.cfg <<EOF
+options {
+  type stand;
+  timeout 60;
+}
+
+net${NETID} {
+  passwd ${SECRET};
+  type ether;
+  proto tcp;
+  nat_hack client;
+  keepalive yes;
+  device tap${NETID};
+}
+
+EOF
+
+echo vtund -n -f vtunclnt.cfg -P ${SRVPORT} net${NETID} ${SRVIP}  

@@ -1,0 +1,7 @@
+alias os=openstack
+alias esi="openstack esi"
+alias bm="openstack baremetal"
+alias ms="metalsmith"
+alias esissh="ssh debian@$(ips)"
+#alias lsnode="esi node list -f value -c Name"
+#alias lsnet="os network list --long -c Name -f value"

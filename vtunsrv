@@ -1,0 +1,28 @@
+#!/bin/bash
+
+EXTERNAL_IFACE=enp3s0f0np0
+SECRET="foobar"
+NETID=01
+cat > vtunsrv.cfg <<EOF
+options {
+  type stand;
+  bindaddr { iface ${EXTERNAL_IFACE}; };
+}
+
+net${NETID} {
+  passwd ${SECRET};
+  type ether;
+  keepalive yes;
+  device tap${NETID};
+  proto udp;
+  nat_hack server;
+  compress no;
+  encrypt no;
+  stat yes;
+  speed 0;
+  multi no;
+}
+
+EOF
+
+vtund -s -n -f vtunsrv.cfg   

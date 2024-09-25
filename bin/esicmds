@@ -1,0 +1,296 @@
+#!/opt/homebrew/bin/bash
+[[ -n ${ESICMD_DEBUG} ]] && set -x
+
+scriptdir=$(dirname $(realpath $0))
+OS="openstack"
+ESI="openstack esi"
+BM="openstack baremetal"
+
+function lsnet()
+{
+    lsnet_usage() { echo "Usage: $0 [-l] [-i] [-T] [-J] [net [net ..]]" 1>&2;
+		    exit 1; }
+    local long=""
+    local nopts=()
+    local aopts=()
+    local format="value"
+    local OPTIND
+    
+    while getopts ":liTJ" o; do
+	case "${o}" in
+            l)
+		long=1
+		nopts=()
+		aopts=()
+		;;
+	    i)
+		nopts+=('id')
+		aopts+=('ID')
+		;;
+	    T) format=table
+	       ;;
+	    J) format=json
+	       ;;	    
+            *)
+		lsnet_usage
+		;;
+	esac
+    done
+    if [[ -z $long  &&  ${#aopts[@]} == 0 ]]; then
+	nopts=( 'status' 'admin_state_up' )
+	aopts=( 'Status' 'State' )
+    fi
+    
+    shift $((OPTIND-1))
+    if (( $# == 0 )); then
+	if (( ${#aopts[@]} > 0 )); then
+	    ${OS} network list --long -f ${format} -c Name ${aopts[@]/#/\-c }
+	else
+	    ${OS} network list --long -f ${format}
+	fi
+    else
+	if (( ${#nopts[@]} > 0 )); then
+	    for net in $@; do
+		echo $net $(${OS} network show -f ${format} ${nopts[@]/#/\-c }
+			    $net)
+	    done
+	else
+	    for net in $@; do
+		echo $net
+		${OS} network show -f ${format} $net
+	    done
+
+	fi
+	
+    fi
+}
+
+function rmnet()
+{
+    ${OS} network delete $1
+}
+
+function nodeoff()
+{
+    ${BM} node power off $1
+}
+
+function nodeon()
+{
+    ${BM} node power on $1
+}
+
+function nodeesicon()
+{
+    nodeesi_usage() { echo "Usage: $0 [-f] node" 1>&2;   exit 1; }
+    local OPTIND
+    local fast
+
+    while getopts ":f" o; do
+	case "${o}" in
+            f)
+		fast=true
+		;;
+            *)
+		nodeesicon_usage
+		;;
+	esac
+    done
+    
+    shift $((OPTIND-1))
+    if (( $# == 0 )); then
+	nodeesi_usage
+    else
+	if [[ -z $fast ]]; then
+	    ${BM} node console disable $1
+	    ${BM} node console enable $1
+	fi
+	${ESI} node console connect $1
+    fi
+}
+
+function lsnode()
+{
+    #set -x
+    lsnode_usage() { echo "Usage: $0 [-l] [-c] [-p] [-T] [-J] [net [net ..]]" 1>&2;
+		     exit 1; }
+    local long=""
+    local conurl=""
+    local nopts=()
+    local aopts=()
+    local format="value"
+    local OPTIND
+    
+    while getopts ":clpTJ" o; do
+	case "${o}" in
+	    c)
+		conurl=true
+		;;
+            l)
+		long=1
+		nopts=()
+		aopts=()
+		;;
+	    p)
+		nopts+=('properties')
+		aopts+=('Name' 'Properties')
+		;;
+	    T) format=table
+	       ;;
+	    J) format=json
+	       ;;	    
+            *)
+		lsnode_usage
+		;;
+	esac
+    done
+    if [[ -z $long  &&  ${#aopts[@]} == 0 ]]; then
+	nopts=( 'power_state' 'status' 'provision_state' 'resource_class' )
+	aopts=( 'Name' )
+    fi
+    
+    shift $((OPTIND-1))
+    if (( $# == 0 )); then
+	if (( ${#aopts[@]} > 0 )); then
+	    ${ESI} node list --long -f ${format}  -c "Provision State" \
+		   -c 'Resource Class' \
+		   ${aopts[@]/#/\-c }
+	else
+	    ${ESI} node list --long -f ${format}
+	fi
+    else
+	if (( ${#nopts[@]} > 0 )); then
+	    for node in $@; do
+		if [[ -n $conurl ]]; then
+		    ${BM} node console show -f json ${node} | \
+			jq -M -r '.console_info.url' | \
+			tr -d '/'
+		else
+		    echo $node $(${BM} node show -f ${format} \
+				       ${nopts[@]/#/\-c } $node)
+		fi
+	    done
+	else
+	    for node in $@; do
+		echo $node
+		${BM} node show -f ${format} $node
+	    done
+	fi
+	
+    fi
+}
+
+function ips()
+{
+    ${OS} floating ip list -f value -c 'Floating IP Address'
+}
+
+function nodecon()
+{
+    #set -x
+    nodecon_usage() { echo "Usage: $0 [-a socat addr] [-b color] [-f color]\
+[-t title] [-w] [-F]  node [ptypath]" 1>&2;
+		    exit 1; }
+    local node
+    local addr
+    local ptypath
+    local fast
+    local window
+    local wtitle
+    local wbgcolor
+    local wfgcolor
+    
+    local OPTARG
+    local OPTIND
+    
+    while getopts ":a:b:f:t:wF" o; do
+	case "${o}" in
+	    a)
+		addr=${OPTARG}
+		;;
+	    b)
+		wbgcolor="-bg ${OPTARG}"
+		;;
+	    f)
+		wfgcolor="-fg ${OPTARG}"
+		;;
+	    w)
+		window=true
+		;;
+	    t)
+		wtitle="-title ${OPTARG}"
+		;;
+	    F)
+		fast=true
+		;;
+            *)
+		nodecon_usage
+		;;
+	esac
+    done
+    shift $((OPTIND-1))
+
+    if (( $# == 0 )); then
+	nodecon_usage
+    fi
+    node=$1
+    
+    if [[ -z $node ]]; then
+	nodecon_usage
+	return 0
+    fi
+
+    if [[ -z $fast ]]; then
+	${BM} node console disable $1
+	${BM} node console enable $1
+    fi
+
+    [[ -z $addr ]] &&
+	addr=$(${ESI} console auth token create -f value -c access_url $node)
+
+#    socat pty,link=$ptypath,waitslave,echo=0,raw,unlink-close=0  $addr,reuseaddr,keepalive,keepintvl=10,keepcnt=1000000000 &
+#    socat pty,link=$ptypath,waitslave,echo=0,raw  $addr,reuseaddr,keepalive,keepintvl=10,keepcnt=1000000000 &
+#    while [[ ! -a $ptypath ]]; do sleep 1; done;
+
+    if [[ -z $window ]]; then
+	stty raw;websocat -b $addr;stty sane
+#	screen $ptypath
+    else
+	[[ -z $wfgcolor ]] && wfgcolor="-fg red"
+	[[ -z $wbgcolor ]] && wbgcolor="-bg black"
+	# FIXME: don't know why the next line causes screen to temrinate
+	[[ -z $wtitle ]] && wtitle="-title ${node}-console"
+	xterm $wtitle $wbgcolor $wfgcolor -e "bash -c 'stty raw;websocat -b $addr;stty sane'" &
+    fi
+}
+
+function freenode()
+{
+    ${BM} node undeploy $1
+#    ${MS} undeploy $1
+}
+declare -g CMD
+# add new supported commands to this array and create matching function
+declare -r -A COMMANDS=( [lsnode]=lsnode
+			 [lsnet]=lsnet
+			 [nodecon]=nodecon
+			 [nodeon]=nodeon
+			 [nodeoff]=nodeoff
+			 [rmnet]=rmnet
+			 [freenode]=freenode
+		         [ips]=ips )
+#${0##*/} $@
+
+if [[ -v COMMANDS[${0##*/}] ]]; then
+    CMD=${0##*/}
+    $CMD $@
+elif [[ -n $1 && -v COMMANDS[$1] ]]; then
+    CMD=$1
+    shift 1
+    $CMD $@
+else
+    echo "commands: ${COMMANDS[@]}"
+    exit -1
+fi
+
+
