@@ -1,8 +1,26 @@
-python3 -mvenv .venv
-source .venv/bin/activate
+#!/bin/bash
+PYENVDIR=python.venv
+
+if [[ ! -a $PYENVDIR/bin/activate ]]; then
+    python3 -mvenv $PYENVDIR
+fi
+
+source $PYENVDIR/bin/activate
+
 pip install --upgrade pip
 pip install --upgrade pip
 pip install --upgrade pip
 pip install python-openstackclient
 pip install python-esiclient
 pip install python-esileapclient
+
+if [[ config/default-cred.sh ]]; then
+    source config/default-cred.sh
+    echo "Testig openstack cli"
+    openstack versions show -f value -c "Max Microversion" --service baremetal
+    if (( $$ = 0 )); then
+	echo "setup seems to be working"
+    else
+	echo "ERROR: setup failed!!!"
+    fi
+fi
