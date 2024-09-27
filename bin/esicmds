@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/bash
+#!/bin/bash
 [[ -n ${ESICMD_DEBUG} ]] && set -x
 
 scriptdir=$(dirname $(realpath $0))
