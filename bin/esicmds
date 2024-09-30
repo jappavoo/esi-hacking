@@ -156,7 +156,7 @@ function lsnode()
 		   -c 'Resource Class' \
 		   ${aopts[@]/#/\-c }
 	else
-	    ${ESI} node list --long -f ${format}
+	    ${ESI} node list --long -f ${format} 
 	fi
     else
 	if (( ${#nopts[@]} > 0 )); then
@@ -185,6 +185,18 @@ function ips()
     ${OS} floating ip list -f value -c 'Floating IP Address'
 }
 
+function macs()
+{
+    local node=$1
+    if [[ -n $node ]]; then
+	${BM} port list -f value -c Address --node $node
+    else
+	${BM} node list -f value -c Name | while read node; do
+	    echo $node $(macs $node)
+	done
+    fi
+}
+
 function nodecon()
 {
     #set -x
@@ -202,7 +214,7 @@ function nodecon()
     
     local OPTARG
     local OPTIND
-    
+
     while getopts ":a:b:f:t:wF" o; do
 	case "${o}" in
 	    a)
@@ -253,14 +265,14 @@ function nodecon()
 #    while [[ ! -a $ptypath ]]; do sleep 1; done;
 
     if [[ -z $window ]]; then
-	stty raw;websocat -b $addr;stty sane
+	stty raw -echo;websocat -E --async-stdio -b $addr;stty sane cooked
 #	screen $ptypath
     else
 	[[ -z $wfgcolor ]] && wfgcolor="-fg red"
 	[[ -z $wbgcolor ]] && wbgcolor="-bg black"
 	# FIXME: don't know why the next line causes screen to temrinate
 	[[ -z $wtitle ]] && wtitle="-title ${node}-console"
-	xterm $wtitle $wbgcolor $wfgcolor -e "bash -c 'stty raw;websocat -b $addr;stty sane'" &
+	xterm $wtitle $wbgcolor $wfgcolor -e "bash -c 'stty raw -echo;websocat -E --async-stdio -b $addr;stty sane cooked'" &
     fi
 }
 
@@ -278,7 +290,8 @@ declare -r -A COMMANDS=( [lsnode]=lsnode
 			 [nodeoff]=nodeoff
 			 [rmnet]=rmnet
 			 [freenode]=freenode
-		         [ips]=ips )
+		         [ips]=ips
+		         [macs]=macs )
 #${0##*/} $@
 
 if [[ -v COMMANDS[${0##*/}] ]]; then
