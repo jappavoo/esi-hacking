@@ -1,0 +1,28 @@
+#!/bin/bash
+set -x
+local_iface=tap0
+local_ip=$(ip -4 -o addr show dev ${local_iface})
+local_ip=${local_ip##*inet }
+local_ip=${local_ip%%/*}
+remote_mac="0c:42:a1:7b:e4:94"
+remote_ip=${local_ip%.*}.${remote_mac##*:}
+remote_name=vic2
+pxelinux=pxelinux.0
+pxeprompt="boot,60"
+
+echo sudo dnsmasq \
+  --no-hosts \
+  --no-daemon \
+  --log-queries=bootme \
+  --log-facility=- \
+  --log-debug \
+  --interface=${local_iface} \
+  --listen-address=${local_ip} \
+  --no-poll \
+  --dump-file=dnsmasq \
+  --dhcp-host="${remote_mac},${remote_ip},${remote_name},infinite" \
+  --dhcp-boot=${pxelinux} \
+  --pxe-prompt=${pxeprompt} \
+  --enable-tftp=${local_iface} \
+  --tftp-root=$(pwd)/tftp
+

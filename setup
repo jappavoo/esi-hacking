@@ -14,7 +14,7 @@ pip install python-openstackclient
 pip install python-esiclient
 pip install python-esileapclient
 
-if [[ config/default-cred.sh ]]; then
+if [[ -a config/default-cred.sh ]]; then
     source config/default-cred.sh
     echo "Testig openstack cli"
     openstack versions show -f value -c "Max Microversion" --service baremetal

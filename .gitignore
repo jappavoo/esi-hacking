@@ -1,4 +1,11 @@
 python.venv
 config/*.sh
 config/*.yaml
+bin/ips
+bin/lsnet
+bin/lsnode
+bin/macs
+bin/nodecon
+bin/nodeoff
+bin/nodeon
 *~

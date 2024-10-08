@@ -8,6 +8,7 @@ BM="openstack baremetal"
 
 function lsnet()
 {
+    #set -x
     lsnet_usage() { echo "Usage: $0 [-l] [-i] [-T] [-J] [net [net ..]]" 1>&2;
 		    exit 1; }
     local long=""
@@ -37,7 +38,7 @@ function lsnet()
 	esac
     done
     if [[ -z $long  &&  ${#aopts[@]} == 0 ]]; then
-	nopts=( 'status' 'admin_state_up' )
+	nopts=( 'status' 'admin_state_up' 'provider:segmentation_id' )
 	aopts=( 'Status' 'State' )
     fi
     
@@ -51,7 +52,7 @@ function lsnet()
     else
 	if (( ${#nopts[@]} > 0 )); then
 	    for net in $@; do
-		echo $net $(${OS} network show -f ${format} ${nopts[@]/#/\-c }
+		echo $net $(${OS} network show -f ${format} ${nopts[@]/#/\-c } \
 			    $net)
 	    done
 	else
@@ -187,12 +188,45 @@ function ips()
 
 function macs()
 {
-    local node=$1
+ #   set -x
+    macs_usage() { echo "Usage: $0 [-p] [node]" 1>&2;
+		     exit 1; }
+    local node
+    local portflg=""
+    local OPTIND
+    
+    while getopts ":p" o; do
+	case "${o}" in
+	    p)
+		portflg="true"
+		;;
+            *)
+		macs_usage
+		;;
+	esac
+    done
+    
+    shift $((OPTIND-1))
+    node=$1
+
     if [[ -n $node ]]; then
-	${BM} port list -f value -c Address --node $node
+	if [[ -z $portflg ]]; then
+	    ${BM} port list -f value -c Address --node $node
+	else
+	    local ms=$(${BM} port list -f value -c Address --node $node)
+	    echo -n $node
+	    for m in $ms; do
+               echo -n " $m,$(${OS} port list -f value -c Name --mac-address $m)"  
+            done
+	    echo 
+	fi
     else
 	${BM} node list -f value -c Name | while read node; do
-	    echo $node $(macs $node)
+	    if [[ -z $portflg ]]; then
+		echo $node $(macs $node)
+	    else
+		echo $(macs -p $node)
+	    fi
 	done
     fi
 }

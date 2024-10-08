@@ -1,0 +1,6 @@
+#!/bin/bash
+
+lport=1234
+echo "$(date): STARt: local: ethernet connected to local port ${lport}"
+sudo socat TUN,tun-type=tap,iff-up TCP:127.0.0.1:${lport}
+echo "$(date): END: local: ethernet connected to local port ${lport}"

@@ -1,0 +1,13 @@
+#!/bin/bash
+#set -x 
+ip=( $(ips) )
+ip=${ip[0]}
+lport=1234
+rport=1234
+
+echo "$(date): START: remote: ethernet tunnel from ${ip}:${rport} to local \
+port ${lport}"
+ssh -L ${lport}:127.0.0.1:${rport} debian@${ip} \
+"sudo socat TUN,tun-type=tap,iff-up TCP-LISTEN:${rport},bind=127.0.0.1,reuseaddr"
+echo "$(date): START: remote: ethernet tunnel from ${ip}:${rport} to local \
+port ${lport}"

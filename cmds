@@ -1,18 +1,74 @@
+### Wire guard GRE Layer 2 tunnel
+
+# server (esi ctl node)
+
+privtag=599
+#  ip link set enp3s0f0np0 mtu 9000
+ip link add link enp3s0f0np0 name priv${privtag} type vlan id $privtag
+# ip link set priv599 mtu 9000
+ip link set priv${privtag} up
+
+apt install wireguard
+wg genkey | tee wgkeyprivs | wg pubkey > wgkeypubs
+ip link add wg0 type wireguard
+wg set wg0 private-key ./wgkeyprivs
+ip addr add 10.1.0.1/16 dev wg0
+# ip link set wg0 mtu 9200
+wg set wg0 listen-port 51820 peer 'FSI+oAxhGmyPS1c2ijVZX7G4c6p6kc4JPxUHYSiJeVc=' allowed-ips 0.0.0.0/0
+ip link set dev wg0 up
+ip link add tap0 type gretap local 10.1.0.1 remote 10.1.0.2
+# ip link set tap0 mtu 9000
+# ip link set erspan0 mtu $(( 9000 + 68 ))
+# ip link set gretap0 mtu $(( 9000 + 68 + 12 ))
+# ip link set gre0 mtu $(( 9000 + 68 + 12 + 14 )) 
+ip link set tap0 up
+
+ip link add br0 type bridge
+ip link set priv${privtag} master br0
+ip link set tap0 master br0
+
+# force spanning tree off
+ip link set br0 type bridge stp_state 0
+ip link set br0 up
+
+
+# client (pt)
+
+sudo apt install wireguard
+wg genkey | tee wgkeyprivc | wg pubkey > wgkeypubc
+ip link add wg0 type wireguard
+wg set wg0 private-key ./wgkeyprivc 
+ip addr add 10.1.0.2/16 dev wg0
+wg set wg0 listen-port 51820 peer 'sEs9Ao1lOZpKGii/Zh4fYCseZnl5sLT+kC3E1yIoj08=' allowed-ips 0.0.0.0/0 endpoint 128.31.20.88:51820 persistent-keepalive 15
+ip link set dev wg0 up
+ip link add tap0 type gretap local 10.1.0.2 remote 10.1.0.1
+ip link set tap0 up
+
+# To use dhcp /tftp we add an address to the client tunneled ethernet
+ip addr add 10.52.1.20/24 dev tap0
+
+
+### SOCAT SSH Layer 2 tunnel
 #ip addr add 192.168.100.2/24 dev tap0
 # on victim 
 ip addr add 10.42.1.3/16 dev enp7s0f0np0 
 
-ip link add link enp3s0f0np0 name priv579 type vlan id 579
+#on control node
+privtag=599
+ip link add link enp3s0f0np0 name priv$privtag type vlan id $privtag
 ip link set priv579 up
 
+# start tunnel to remote site aka laptop/on prem server
 
 ip link add br0 type bridge
-ip link set priv579 master br0
+ip link set priv${privtag} master br0
 ip link set tap0 master br0
 
-ip link set br0 type bridge stp_state 1
+# force spanning tree off
+ip link set br0 type bridge stp_state 0
 ip link set br0 up
 
+####
 
 # esi create networks
 #create control network
@@ -40,8 +96,35 @@ openstack esi trunk add network --tagged-networks priv-net0  ctl-trunk
 openstack esi node network attach --trunk ctl-trunk --mac-address 00:0f:53:22:e0:70 oct4-14
 
 #   create a router
+openstack router create ctl-net-router
+
+# connect router to external network (MOC provided)
+openstack router set --external-gateway external ctl-net-router
+
+# attach router to the private control network's ip subnet
+openstack router add subnet ctl-net-router ctl-net-sub
 
 #   add a floating ip and nat to control node
+#      create -- request and reserver a floating ip from the MOC's external network
+openstack floating ip create external
+#   route our external floating ip to our control server via our ctl-router
+#   list mac addresses of the control server and port of the ctr network it is
+#   attached by
+openstack baremetal port list --node oct4-14
+openstack port list --mac-address 00:0f:53:22:e0:70
+# or use esi command
+openstack esi node network list --node oct4-14
+
+# now connect the floating ip to the port of the control server on the trunk
+openstack floating ip set --port esi-ctl-trunk-ctl-net-trunk-port 128.31.20.88
+
+# configure victim for external provisioning
+openstack baremetal node manage <victim>
+openstack baremetal node adopt <victim>
+
+# set boot device to network
+openstack baremetal node boot device set $vic2 pxe --persistent
+
 
 # add a victim node to the private network
 openstack esi node network attach --network priv-net0 --mac-address 24:8a:07:1e:85:a0  MOC-R4PAC10U03-S3
