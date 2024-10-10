@@ -7,22 +7,24 @@ local_ip=${local_ip%%/*}
 remote_mac="0c:42:a1:7b:e4:94"
 remote_ip=${local_ip%.*}.${remote_mac##*:}
 remote_name=vic2
-pxelinux=pxelinux.0
+bootfile=tag:!ipxe,undionly.kpxe
 pxeprompt="boot,60"
 
-echo sudo dnsmasq \
+sudo dnsmasq \
+  --port=0 \
   --no-hosts \
   --no-daemon \
-  --log-queries=bootme \
+  --log-queries \
   --log-facility=- \
+  --log-dhcp \
   --log-debug \
   --interface=${local_iface} \
   --listen-address=${local_ip} \
   --no-poll \
-  --dump-file=dnsmasq \
+  --dumpfile=dnsmasq \
+  --dhcp-match=set:ipxe,175 \
   --dhcp-host="${remote_mac},${remote_ip},${remote_name},infinite" \
-  --dhcp-boot=${pxelinux} \
-  --pxe-prompt=${pxeprompt} \
+  --dhcp-boot=${bootfile} \
   --enable-tftp=${local_iface} \
   --tftp-root=$(pwd)/tftp
 

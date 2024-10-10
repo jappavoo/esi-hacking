@@ -18,7 +18,7 @@ if [[ -a config/default-cred.sh ]]; then
     source config/default-cred.sh
     echo "Testig openstack cli"
     openstack versions show -f value -c "Max Microversion" --service baremetal
-    if (( $$ = 0 )); then
+    if (( $? = 0 )); then
 	echo "setup seems to be working"
     else
 	echo "ERROR: setup failed!!!"
